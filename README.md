@@ -34,6 +34,34 @@ kc delete GITHUB_TOKEN
 kc run GITHUB_TOKEN DB_PASS=PGPASSWORD -- psql -h db.example.com
 ```
 
+### Deploying: push secrets to your host
+
+A deployed app needs its secrets on the host, but the Keychain can stay the
+one place you edit them. `kc sync` pushes them into a host's secret store
+through its own CLI, passing each value on stdin (never in arguments or
+output):
+
+```bash
+kc sync wrangler RESEND_API_KEY CRON_SECRET          # Cloudflare Workers
+kc sync vercel RESEND_API_KEY                        # Vercel, production env
+kc sync vercel RESEND_API_KEY -- preview             # another Vercel env
+kc sync gh RESEND_API_KEY -- --repo you/your-repo    # GitHub Actions secrets
+kc sync fly RESEND_API_KEY -- -a your-app            # Fly.io (one restart)
+kc sync --dry-run vercel RESEND_API_KEY              # show the commands only
+```
+
+`NAME=VAR` renames on the way out, and anything after `--` goes to the host's
+CLI (e.g. `--env production` for wrangler). The CLI is found in
+`./node_modules/.bin` first, then `$PATH`. Every secret is read before
+anything is pushed, so a missing one fails cleanly.
+
+Put it in front of your deploy so the host is overwritten from the Keychain
+every time, and rotating a key is `kc set NAME` followed by a deploy:
+
+```json
+"deploy": "kc sync wrangler RESEND_API_KEY CRON_SECRET && wrangler deploy"
+```
+
 ### Namespaces
 
 Use `--service` (or `$KC_SERVICE`) to keep separate groups of secrets, e.g.

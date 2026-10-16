@@ -12,6 +12,10 @@ commands:
   delete <name>                remove a secret
   run <name[=VAR]>... -- <cmd> run cmd with secrets exported as env vars
                                (VAR defaults to the secret name)
+  sync [--dry-run] <target> <name[=VAR]>... [-- <args>]
+                               push secrets to a deploy host's secret store;
+                               target is wrangler, vercel (default env:
+                               production), gh or fly; <args> go to its CLI
 
 options:
   --service NAME               keychain service to use (default: \(Keychain.defaultService),
@@ -52,14 +56,8 @@ func runCommand(_ args: [String], keychain: Keychain) throws -> Never {
     let command = Array(args[(separator + 1)...])
     guard !command.isEmpty else { throw UsageError(description: "run needs a command after `--`") }
 
-    for spec in specs {
-        let parts = spec.split(separator: "=", maxSplits: 1).map(String.init)
-        let name = parts[0]
-        let variable = parts.count == 2 ? parts[1] : name
-        guard let value = try keychain.get(name) else {
-            throw UsageError(description: "no secret named '\(name)'")
-        }
-        setenv(variable, value, 1)
+    for spec in specs.map(SecretSpec.init) {
+        setenv(spec.variable, try spec.value(from: keychain), 1)
     }
 
     var argv = command.map { strdup($0) }
@@ -102,6 +100,8 @@ func main() throws {
         guard try keychain.delete(args[0]) else { fail("no secret named '\(args[0])'") }
     case ("run", _):
         try runCommand(args, keychain: keychain)
+    case ("sync", _):
+        try syncCommand(args, keychain: keychain)
     case ("help", _), ("-h", _), ("--help", _):
         print(usage)
     default:
