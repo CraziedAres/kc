@@ -20,6 +20,21 @@ struct SecretSpec {
         }
         return value
     }
+
+    /// Parses a list of specs, where `--all` stands for every secret in the
+    /// keychain's service. Explicit specs win over `--all` for the same name,
+    /// so `--all DB_PASS=PGPASSWORD` exports everything with one rename.
+    static func parse(_ args: some Collection<String>, keychain: Keychain) throws -> [SecretSpec] {
+        let explicit = args.filter { $0 != "--all" }.map(SecretSpec.init)
+        guard args.contains("--all") else { return explicit }
+
+        let named = Set(explicit.map(\.name))
+        let everything = try keychain.list().filter { !named.contains($0) }.map(SecretSpec.init)
+        guard !everything.isEmpty || !explicit.isEmpty else {
+            throw UsageError(description: "--all: no secrets in service '\(keychain.service)'")
+        }
+        return everything + explicit
+    }
 }
 
 /// One invocation of a host's CLI. The secret travels on stdin only, never in
@@ -93,7 +108,7 @@ func syncCommand(_ args: [String], keychain: Keychain) throws {
     args.removeFirst()
 
     let separator = args.firstIndex(of: "--") ?? args.endIndex
-    let specs = args[..<separator].map(SecretSpec.init)
+    let specs = try SecretSpec.parse(args[..<separator], keychain: keychain)
     let extra = separator < args.endIndex ? Array(args[(separator + 1)...]) : []
     guard !specs.isEmpty else { throw UsageError(description: "sync needs at least one secret name") }
 

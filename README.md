@@ -29,10 +29,30 @@ kc get GITHUB_TOKEN | pbcopy   # copy it (no trailing newline when piped)
 kc list                        # names only, never values
 kc delete GITHUB_TOKEN
 
+# Generate a random secret (letters and digits) without ever seeing it.
+kc gen CRON_SECRET             # 32 characters
+kc gen ADMIN_PASSWORD 48       # pick a length (8–4096)
+kc gen --force CRON_SECRET     # replace an existing one (rotation)
+
 # Run a command with secrets exported as environment variables.
 # NAME exports as $NAME; NAME=VAR exports as $VAR.
 kc run GITHUB_TOKEN DB_PASS=PGPASSWORD -- psql -h db.example.com
 ```
+
+### Agents: one namespace each
+
+Give each agent (or project) its own service and launch it with `--all`, which
+exports every secret in that service. The agent gets exactly the keys it
+needs, and adding one is just `kc set`, with no launch script to edit:
+
+```bash
+kc --service agent-mail set ANTHROPIC_API_KEY
+kc --service agent-mail set GMAIL_TOKEN
+kc --service agent-mail run --all -- bun agent.ts
+```
+
+`--all` combines with renames: `--all DB_PASS=PGPASSWORD` exports everything,
+with `DB_PASS` as `$PGPASSWORD`. It works for `kc sync` too.
 
 ### Deploying: push secrets to your host
 

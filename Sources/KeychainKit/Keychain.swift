@@ -94,6 +94,10 @@ public struct Keychain {
 public struct KeychainError: Error, CustomStringConvertible {
     public let status: OSStatus
 
+    public init(status: OSStatus) {
+        self.status = status
+    }
+
     public var description: String {
         let message = SecCopyErrorMessageString(status, nil) as String? ?? "unknown error"
         return "Keychain error \(status): \(message)"
